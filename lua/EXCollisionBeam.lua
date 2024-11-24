@@ -5,16 +5,17 @@
 --**
 --**  Summary  :
 --**
---**  Copyright © 2005 Gas Powered Games, Inc.  All rights reserved.
+--**  Copyright ï¿½ 2005 Gas Powered Games, Inc.  All rights reserved.
 --****************************************************************************
 --
 -- CollisionBeam is the simulation (gameplay-relevant) portion of a beam. It wraps a special effect
 -- that may or may not exist depending on how the simulation is executing.
 --
 local DefaultDamage = import('/lua/sim/defaultdamage.lua')
+local CollisionBeamEntity = moho.CollisionBeamEntity
 
-CollisionBeam = Class(moho.CollisionBeamEntity) {
-
+---@class CollisionBeam : CollisionBeamEntity
+CollisionBeam = Class(CollisionBeamEntity) {
     FxBeam = {},
     FxBeamStartPoint = {},
     FxBeamStartPointScale = 1,
@@ -37,6 +38,7 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
     TerrainImpactType = 'Default',
     TerrainImpactScale = 1,
 
+    ---@param self CollisionBeam
     OnCreate = function(self)
         self.LastTerrainType = nil
         self.BeamEffectsBag = {}
@@ -44,31 +46,40 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         self.Trash = TrashBag()
     end,
 
+    ---@param self CollisionBeam
     OnDestroy = function(self)
         if self.Trash then
             self.Trash:Destroy()
         end
     end,
 
+    ---@param self CollisionBeam
     OnEnable = function(self)
         self:CreateBeamEffects()
     end,
 
+    ---@param self CollisionBeam
     OnDisable = function(self)
         self:DestroyBeamEffects()
         self:DestroyTerrainEffects()
         self.LastTerrainType = nil
     end,
 
+    ---@param self CollisionBeam
+    ---@param weapon Weapon
     SetParentWeapon = function(self, weapon)
         self.Weapon = weapon
     end,
 
+    ---@param self CollisionBeam
+    ---@param instigator Unit
+    ---@param damageData table
+    ---@param targetEntity Entity
     DoDamage = function(self, instigator, damageData, targetEntity)
         local damage = damageData.DamageAmount or 0
         local dmgmod = 1
         if self.Weapon.DamageModifiers then
-            for k, v in self.Weapon.DamageModifiers do
+            for _, v in self.Weapon.DamageModifiers do
                 dmgmod = v * dmgmod
             end
         end
@@ -95,14 +106,16 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         end
     end,
 
+    ---@param self CollisionBeam
     CreateBeamEffects = function(self)
-        local army = self:GetArmy()
-        for k, y in self.FxBeamStartPoint do
+        local army = self.Army
+
+        for _, y in self.FxBeamStartPoint do
             local fx = CreateAttachedEmitter(self, 0, army, y):ScaleEmitter(self.FxBeamStartPointScale)
             table.insert(self.BeamEffectsBag, fx)
             self.Trash:Add(fx)
         end
-        for k, y in self.FxBeamEndPoint do
+        for _, y in self.FxBeamEndPoint do
             local fx = CreateAttachedEmitter(self, 1, army, y):ScaleEmitter(self.FxBeamEndPointScale)
             table.insert(self.BeamEffectsBag, fx)
             self.Trash:Add(fx)
@@ -123,18 +136,23 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         end
     end,
 
+    ---@param self CollisionBeam
     DestroyBeamEffects = function(self)
-        for k, v in self.BeamEffectsBag do
+        for _, v in self.BeamEffectsBag do
             v:Destroy()
         end
         self.BeamEffectsBag = {}
     end,
 
+    ---@param self CollisionBeam
+    ---@param army Army
+    ---@param EffectTable table
+    ---@param EffectScale number
     CreateImpactEffects = function(self, army, EffectTable, EffectScale)
         local emit = nil
         EffectTable = EffectTable or {}
         EffectScale = EffectScale or 1
-        for k, v in EffectTable do
+        for _, v in EffectTable do
             emit = CreateEmitterAtBone(self,1,army,v)
             if emit and EffectScale != 1 then
                 emit:ScaleEmitter(EffectScale)
@@ -142,9 +160,13 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         end
     end,
 
+    ---@param self CollisionBeam
+    ---@param army Army
+    ---@param EffectTable table
+    ---@param EffectScale number
     CreateTerrainEffects = function(self, army, EffectTable, EffectScale)
         local emit = nil
-        for k, v in EffectTable do
+        for _, v in EffectTable do
             emit = CreateAttachedEmitter(self,1,army,v)
             table.insert(self.TerrainEffectsBag, emit)
             if emit and EffectScale != 1 then
@@ -153,13 +175,16 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         end
     end,
 
+    ---@param self CollisionBeam
     DestroyTerrainEffects = function(self)
-        for k, v in self.TerrainEffectsBag do
+        for _, v in self.TerrainEffectsBag do
             v:Destroy()
         end
         self.TerrainEffectsBag = {}
     end,
 
+    ---@param self CollisionBeam
+    ---@param TargetType string
     UpdateTerrainCollisionEffects = function(self, TargetType)
         local pos = self:GetPosition(1)
         local TerrainType = nil
@@ -174,15 +199,18 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
 
         if TerrainEffects and (self.LastTerrainType != TerrainType) then
             self:DestroyTerrainEffects()
-            self:CreateTerrainEffects(self:GetArmy(), TerrainEffects, self.TerrainImpactScale)
+            self:CreateTerrainEffects(self.Army, TerrainEffects, self.TerrainImpactScale)
             self.LastTerrainType = TerrainType
         end
     end,
 
-    -- This is called when the collision beam hits something new. Because the beam
-    -- is continuously detecting collisions it only executes this function when the
-    -- thing it is touching changes. Expect Impacts with non-physical things like
-    -- 'Air' (hitting nothing) and 'Underwater' (hitting nothing underwater).
+    --- This is called when the collision beam hits something new. Because the beam
+    --- is continuously detecting collisions it only executes this function when the
+    --- thing it is touching changes. Expect Impacts with non-physical things like
+    --- 'Air' (hitting nothing) and 'Underwater' (hitting nothing underwater).
+    ---@param self CollisionBeam
+    ---@param impactType string
+    ---@param targetEntity Entity
     OnImpact = function(self, impactType, targetEntity)
         --LOG('*DEBUG: COLLISION BEAM ONIMPACT ', repr(self))
         --LOG('*DEBUG: COLLISION BEAM ONIMPACT, WEAPON =  ', repr(self.Weapon), 'Type = ', impactType)
@@ -250,12 +278,15 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         self:UpdateTerrainCollisionEffects(impactType)
     end,
 
+    ---@param self CollisionBeam
+    ---@return boolean
     GetCollideFriendly = function(self)
         return self.DamageData.CollideFriendly
     end,
 
+    ---@param self CollisionBeam
     SetDamageTable = function(self)
-        local weaponBlueprint = self.Weapon:GetBlueprint()
+        local weaponBlueprint = self.Weapon.Blueprint
         self.DamageTable = {}
         self.DamageTable.DamageRadius = weaponBlueprint.DamageRadius
         self.DamageTable.DamageAmount = weaponBlueprint.Damage
@@ -268,10 +299,12 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
     end,
 
     --When this beam impacts with the target, do any buffs that have been passed to it.
+    ---@param self CollisionBeam
+    ---@param target string
     DoUnitImpactBuffs = function(self, target)
         local data = self.DamageTable
         if data.Buffs then
-            for k, v in data.Buffs do
+            for _, v in data.Buffs do
                 if v.Add.OnImpact == true and not EntityCategoryContains((ParseEntityCategory(v.TargetDisallow) or ''), target)
                     and EntityCategoryContains((ParseEntityCategory(v.TargetAllow) or categories.ALLUNITS), target) then
 
@@ -281,6 +314,10 @@ CollisionBeam = Class(moho.CollisionBeamEntity) {
         end
     end,
 
+    ---@param self CollisionBeam
+    ---@param fn function
+    ---@param ... unknown
+    ---@return thread
     ForkThread = function(self, fn, ...)
         if fn then
             local thread = ForkThread(fn, self, unpack(arg))
